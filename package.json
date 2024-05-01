@@ -1,0 +1,24 @@
+{
+  "private": true,
+  "workspaces": [
+    "config/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "format": "turbo run format --continue -- --cache --cache-location node_modules/.cache/.eslintcache",
+    "format:fix": "turbo run format --continue -- --write --cache --cache-location node_modules/.cache/.eslintcache",
+    "lint": "turbo run lint --continue -- --cache --cache-location node_modules/.cache/.prettiercache",
+    "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location node_modules/.cache/.prettiercache"
+  },
+  "devDependencies": {
+    "@blaaah/prettier-config": "^0.1.0",
+    "turbo": "^1.13.2"
+  },
+  "packageManager": "npm@8.19.4",
+  "engines": {
+    "node": ">=18"
+  },
+  "prettier": "@blaaah/prettier-config"
+}

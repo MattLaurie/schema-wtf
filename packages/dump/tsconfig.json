@@ -1,0 +1,12 @@
+{
+  "extends": "@blaaah/typescript-config/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["*.ts", "src", "test"],
+  "exclude": ["dist", "node_modules"]
+}

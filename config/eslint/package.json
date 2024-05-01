@@ -1,0 +1,29 @@
+{
+  "name": "@blaaah/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.2",
+    "@typescript-eslint/parser": "^7.0.2",
+    "eslint-config-turbo": "^1.12.4",
+    "eslint-plugin-import": "^2.29.1"
+  },
+  "devDependencies": {
+    "@blaaah/prettier-config": "^0.1.0",
+    "@blaaah/typescript-config": "^0.1.0",
+    "@types/eslint": "^8.56.3",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "eslintConfig": {
+    "root": true,
+    "extends": [
+      "./base.js"
+    ]
+  },
+  "prettier": "@blaaah/prettier-config"
+}
