@@ -1,14 +1,14 @@
 import "@dotenv-run/load";
-import mysql from "mysql2/promise";
+import mysql, {type RowDataPacket} from "mysql2/promise";
 
 import {env} from "./env";
 
-type Table = {
+interface RawTable {
     table_schema: string;
     table_name: string;
 }
 
-type ForeignKeys = {
+interface RawForeignKey {
     constraint_name: string;
     source_schema: string;
     source_table: string;
@@ -20,6 +20,10 @@ type ForeignKeys = {
     column_key: string;
 }
 
+const isPrimaryKey = (key: RawForeignKey) => key?.constraint_name === 'PRIMARY';
+const isAutoIncrement = (key: RawForeignKey) => key?.extra === 'auto_increment';
+const isUniqueKey = (key: RawForeignKey) => key?.column_key === 'UNI';
+
 const pool = mysql.createPool({
     host: env.DATABASE_HOST,
     database: env.DATABASE_NAME,
@@ -28,23 +32,26 @@ const pool = mysql.createPool({
     port: env.DATABASE_PORT,
 });
 
-const listTables = async (table_schema: string): Promise<Table[]> => {
-    const [rows, fields] = await pool.query<mysql.RowDataPacket[]>(
+const listTables = async (table_schema: string): Promise<RawTable[]> => {
+    const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT 
-            T.TABLE_NAME AS table_name, T.TABLE_SCHEMA AS table_schema
+            T.TABLE_NAME AS table_name, 
+            T.TABLE_SCHEMA AS table_schema
          FROM
             INFORMATION_SCHEMA.TABLES AS T
          WHERE
-            T.TABLE_SCHEMA = '${table_schema}'`
+            T.TABLE_SCHEMA = '${table_schema}'
+        `
     );
-    return rows.map((result) => ({
-        table_name: result['table_name'],
-        table_schema: result['table_schema'],
-    }))
+    const mapper = (result: RowDataPacket) => ({
+        table_name: result.table_name as string,
+        table_schema: result.table_schema as string,
+    });
+    return rows.map(mapper);
 }
 
-const listForeignKeys = async (table_schema: string, table_name: string): Promise<ForeignKeys[]> => {
-    const [rows, fields] = await pool.query<mysql.RowDataPacket[]>(
+const listForeignKeys = async (table_schema: string, table_name: string): Promise<RawForeignKey[]> => {
+    const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT 
             K.CONSTRAINT_NAME AS constraint_name,
             K.CONSTRAINT_SCHEMA AS source_schema,
@@ -62,29 +69,77 @@ const listForeignKeys = async (table_schema: string, table_name: string): Promis
                 AND C.COLUMN_NAME = K.COLUMN_NAME
                 AND C.TABLE_SCHEMA = K.CONSTRAINT_SCHEMA
         WHERE
-            K.TABLE_NAME = '${table_name}'
-        AND C.TABLE_SCHEMA = '${table_schema}';`
+            C.TABLE_SCHEMA = '${table_schema}'
+        AND K.TABLE_NAME = '${table_name}'
+        `
     );
-    return rows.map((result) => ({
-        constraint_name: result['constraint_name'],
-        source_schema: result['source_schema'],
-        source_table: result['source_table'],
-        source_column: result['source_column'],
-        target_schema: result['target_schema'],
-        target_table: result['target_table'],
-        target_column: result['target_column'],
-        extra: result['extra'],
-        column_key: result['column_key'],
-    }))
+    const mapper = (result: RowDataPacket) => ({
+        constraint_name: result.constraint_name as string,
+        source_schema: result.source_schema as string,
+        source_table: result.source_table as string,
+        source_column: result.source_column as string,
+        target_schema: result.target_schema as string,
+        target_table: result.target_table as string,
+        target_column: result.target_column as string,
+        extra: result.extra as string,
+        column_key: result.column_key as string,
+    })
+    return rows.map(mapper)
 }
 
-try {
-    const tables = await listTables(env.DATABASE_NAME);
-    for (const table of tables) {
-        console.log(`Table: ${table.table_schema}.${table.table_name}`);
-        const foreignKeys = await listForeignKeys(table.table_schema, table.table_name);
-        console.log(`- ForeignKeys`, foreignKeys);
+const IGNORE_TABLES = [
+    'SequelizeMeta'
+];
+
+const isIgnoredTable = (table: RawTable) => IGNORE_TABLES.indexOf(table.table_name) !== -1;
+
+async function dump() {
+    try {
+        const tables = await listTables(env.DATABASE_NAME);
+
+        const entities: string[] = [];
+        const relations: string[] = [];
+
+        for (const table of tables) {
+            if (isIgnoredTable(table)) {
+                continue;
+            }
+            const foreignKeys = await listForeignKeys(table.table_schema, table.table_name);
+
+            entities.push(
+                [
+                    `entity ${table.table_name} {`,
+                    ...foreignKeys.map((key) => `  * ${key.source_column}`),
+                    `}`
+                ].join('\n')
+            )
+            for (const key of foreignKeys) {
+                if (!isPrimaryKey(key) && !isUniqueKey(key)) {
+                    relations.push(`${key.source_table} ||--|| ${key.target_table}`);
+                }
+            }
+        }
+
+        console.log(
+            [
+                '@startuml',
+                '\' hide the spot',
+                '\' hide circle',
+                '',
+                '\' avoid problems with angled crows feet',
+                'skinparam linetype ortho',
+                ''
+            ].join('\n')
+        )
+        entities.forEach((str) => console.log(str));
+        relations.forEach((str) => console.log(str));
+
+        console.log('@enduml')
+    } catch (error) {
+        console.log(error);
     }
-} catch (error) {
-    console.log(error);
 }
+
+(async () => {
+    await dump();
+})().then(() => process.exit());
