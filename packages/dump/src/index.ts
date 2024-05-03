@@ -99,9 +99,9 @@ const listConstraints = async (table_schema: string, table_name: string): Promis
     source_schema: result.source_schema as string,
     source_table: result.source_table as string,
     source_column: result.source_column as string,
-    target_schema: result.target_schema,
-    target_table: result.target_table,
-    target_column: result.target_column,
+    target_schema: result.target_schema ? (result.target_schema as string) : null, // TODO do better than this
+    target_table: result.target_table ? (result.target_table as string) : null,
+    target_column: result.target_column ? (result.target_column as string) : null,
     extra: result.extra as string,
     column_key: result.column_key as string,
   });
@@ -132,21 +132,19 @@ const listColumns = async (table_schema: string, table_name: string): Promise<Ra
     table_schema: result.table_schema as string,
     column_name: result.column_name as string,
     ordinal_position: Number(result.ordinal_position),
-    column_default: result.column_default,
+    column_default: result.column_default as string,
     is_nullable: Boolean(result.is_nullable),
     data_type: result.data_type as string,
-    column_type: result.column_type as string
+    column_type: result.column_type as string,
   });
   return rows.map(mapper);
 };
-
-const FILTER: string[] = ['Facilities'];
 
 const isEmpty = (value: string) => value?.trim().length === 0;
 
 const isForeignKey = (c: RawConstraint) => c.source_column != null && c.target_column != null;
 const isUnique = (c: RawConstraint, constraints: RawConstraint[]) => {
-    return constraints.some((v) => v.constraint_name === c.constraint_name && (v.column_key === 'UNI'))
+  return constraints.some((v) => v.constraint_name === c.constraint_name && v.column_key === 'UNI');
 };
 const isPrimaryKey = (c: RawConstraint) => {
   return c.constraint_name === 'PRIMARY';
@@ -157,25 +155,35 @@ const isAutoIncrement = (c: RawConstraint) => {
 
 async function dump() {
   try {
+    const output: string[] = [];
+    output.push('@startuml', '', 'skinparam linetype ortho', '');
+
     const tables = await listTables(env.DATABASE_NAME);
+
+    const entities: string[] = [];
+    const relations: string[] = [];
+
     for (const table of tables) {
-      if (FILTER.indexOf(table.table_name) === -1) {
-        continue;
-      }
-      console.log(`${table.table_name}`);
-      const constraints = await listConstraints(table.table_schema, table.table_name);
-      for (const fk of constraints) {
-        console.log(`- `, {
-          fk,
-          is_foreign_key: isForeignKey(fk),
-          is_unique: isUnique(fk, constraints),
-          is_primary_key: isPrimaryKey(fk),
-          is_auto_increment: isAutoIncrement(fk),
-        });
-      }
       const columns = await listColumns(table.table_schema, table.table_name);
-      console.log(columns)
+      entities.push(
+          [
+            `entity ${table.table_name} {`,
+            ...columns.map((c) => `  ${c.column_name} : ${c.column_type}`),
+            '}'
+          ].join('\n')
+      )
+      const constraints = await listConstraints(table.table_schema, table.table_name);
+      for (const c of constraints) {
+        if (isForeignKey(c)) {
+          relations.push(`${c.source_table} ||--|| ${c.target_table}`)
+        }
+      }
     }
+    output.push(...entities);
+    output.push(...relations);
+    output.push('@enduml');
+
+    console.log(output.join('\n'));
   } catch (error) {
     console.log(error);
   }

@@ -16,10 +16,12 @@ const config = {
   //   "^[../]",
   //   "^[./]",
   // ],
-  importOrderParserPlugins: ["typescript", "jsx", "decorators-legacy"],
-  importOrderTypeScriptVersion: "4.4.0",
+  // importOrderParserPlugins: ["typescript", "jsx", "decorators-legacy"],
+  // importOrderTypeScriptVersion: "4.4.0",
   printWidth: 250,
-  singleQuote: true
+  singleQuote: true,
+  tabWidth: 2,
+  endOfLine: 'lf',
 };
 
 export default config;
