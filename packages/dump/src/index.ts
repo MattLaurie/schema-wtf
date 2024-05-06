@@ -2,6 +2,7 @@ import '@dotenv-run/load';
 
 import type { RowDataPacket } from 'mysql2/promise';
 import mysql from 'mysql2/promise';
+import { singularize } from 'inflection';
 
 import { env } from './env';
 
@@ -153,37 +154,86 @@ const isAutoIncrement = (c: RawConstraint) => {
   return c.extra === 'auto_increment';
 };
 
+const FILTER_TABLES: (string | RegExp)[] = [
+    // 'Shipments',
+    // 'ShipmentInlands',
+    // 'ShipmentFeeders'
+    // 'CompanyAddresses',
+    // 'CompanyContacts'
+    /^.*XeroInvoice.*$/
+];
+
+const isFiltered = (table: RawTable): boolean => {
+  if (FILTER_TABLES.length === 0) {
+    return false;
+  }
+  for (const filter of FILTER_TABLES) {
+    if (typeof filter === 'string') {
+      if (filter === table.table_name) {
+        return true;
+      }
+    } else {
+      return filter.test(table.table_name);
+    }
+  }
+  return false;
+}
+
 async function dump() {
   try {
-    const output: string[] = [];
-    output.push('@startuml', '', 'skinparam linetype ortho', '');
+    // const output: string[] = [];
+    // output.push('@startuml', '', 'skinparam linetype ortho', '');
 
     const tables = await listTables(env.DATABASE_NAME);
 
-    const entities: string[] = [];
-    const relations: string[] = [];
-
     for (const table of tables) {
-      const columns = await listColumns(table.table_schema, table.table_name);
-      entities.push(
-          [
-            `entity ${table.table_name} {`,
-            ...columns.map((c) => `  ${c.column_name} : ${c.column_type}`),
-            '}'
-          ].join('\n')
-      )
+      if (!isFiltered(table)) {
+        continue;
+      }
+      if (table.table_type === 'VIEW') {
+        continue;
+      }
+      console.log(`table: ${table.table_name}`)
       const constraints = await listConstraints(table.table_schema, table.table_name);
-      for (const c of constraints) {
-        if (isForeignKey(c)) {
-          relations.push(`${c.source_table} ||--|| ${c.target_table}`)
-        }
+      for (const constraint of constraints) {
+
+        // Primary key => target_schema=null AND column_key='PRI'
+        // Composite primary key => Multiple target_schema=null AND column_key='PRI'
+        // Primary key auto increment => target_schema=null AND column_key='PRI' AND extra='auto_increment'
+        // Unique key => target_schema=null AND column_key='UNI'
+        //
+
+
+        console.log(`${table.table_name}`, {
+          constraint
+        })
       }
     }
-    output.push(...entities);
-    output.push(...relations);
-    output.push('@enduml');
 
-    console.log(output.join('\n'));
+    // const entities: string[] = [];
+    // const relations: string[] = [];
+    //
+    // for (const table of tables) {
+    //   const columns = await listColumns(table.table_schema, table.table_name);
+    //   entities.push(
+    //       [
+    //         `entity ${table.table_name} {`,
+    //         ...columns.map((c) => `  ${c.column_name} : ${c.column_type}`),
+    //         '}'
+    //       ].join('\n')
+    //   )
+    //   const constraints = await listConstraints(table.table_schema, table.table_name);
+    //   for (const c of constraints) {
+    //     if (isForeignKey(c)) {
+    //       relations.push(`${c.source_table} ||--|| ${c.target_table}`)
+    //     }
+    //   }
+    // }
+    // output.push(...entities);
+    // output.push(...relations);
+    // output.push('@enduml');
+    //
+    // console.log(output.join('\n'));
   } catch (error) {
     console.log(error);
   }

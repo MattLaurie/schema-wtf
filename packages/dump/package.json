@@ -11,11 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dotenv-run/load": "^1.3.4",
     "@t3-oss/env-core": "^0.10.1",
+    "inflection": "^3.0.0",
     "mysql2": "^3.9.7",
     "reflect-metadata": "^0.2.2",
-    "zod": "^3.23.5",
-    "@dotenv-run/load": "^1.3.4"
+    "zod": "^3.23.5"
   },
   "devDependencies": {
     "@blaaah/eslint-config": "^0.1.0",
